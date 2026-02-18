@@ -1,0 +1,67 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum OwnerType {
+  USER
+  SYSTEM
+}
+
+enum TransactionType {
+  TOPUP
+  BONUS
+  SPEND
+}
+
+model AssetType {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  symbol    String    @unique
+  createdAt DateTime  @default(now()) @map("created_at")
+  accounts  Account[]
+
+  @@map("asset_types")
+}
+
+model Account {
+  id          String    @id @default(uuid())
+  ownerId     String?   @map("owner_id")
+  ownerType   OwnerType @map("owner_type")
+  assetTypeId String    @map("asset_type_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  assetType     AssetType     @relation(fields: [assetTypeId], references: [id])
+  debitEntries  LedgerEntry[] @relation("DebitAccount")
+  creditEntries LedgerEntry[] @relation("CreditAccount")
+
+  @@unique([ownerId, assetTypeId], name: "unique_owner_asset")
+  @@index([ownerId])
+  @@index([assetTypeId])
+  @@map("accounts")
+}
+
+model LedgerEntry {
+  id              String          @id @default(uuid())
+  debitAccountId  String          @map("debit_account_id")
+  creditAccountId String          @map("credit_account_id")
+  amount          Decimal         @db.Decimal(20, 8)
+  type            TransactionType
+  idempotencyKey  String          @unique @map("idempotency_key")
+  referenceId     String?         @map("reference_id")
+  note            String?
+  createdAt       DateTime        @default(now()) @map("created_at")
+
+  debitAccount  Account @relation("DebitAccount", fields: [debitAccountId], references: [id])
+  creditAccount Account @relation("CreditAccount", fields: [creditAccountId], references: [id])
+
+  @@index([debitAccountId])
+  @@index([creditAccountId])
+  @@index([idempotencyKey])
+  @@index([createdAt])
+  @@map("ledger_entries")
+}
