@@ -1,8 +1,4 @@
-import {
-  PrismaClient,
-  OwnerType,
-  TransactionType,
-} from "../src/generated/prisma/client";
+import {PrismaClient, OwnerType, TransactionType } from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { v4 as uuidv4 } from "uuid";
 
@@ -12,21 +8,25 @@ const prisma = new PrismaClient({ adapter });
 async function main() {
   console.log("🌱 Seeding database...");
 
+  const GOLD_ID   = "00000000-0000-4000-a000-000000000001";
+  const DMD_ID    = "00000000-0000-4000-a000-000000000002";
+  const LPT_ID    = "00000000-0000-4000-a000-000000000003";
+
   const [goldCoins, diamonds, loyaltyPoints] = await Promise.all([
     prisma.assetType.upsert({
       where: { name: "Gold Coins" },
       update: {},
-      create: { id: uuidv4(), name: "Gold Coins", symbol: "GLD" },
+      create: { id: GOLD_ID, name: "Gold Coins", symbol: "GLD" },
     }),
     prisma.assetType.upsert({
       where: { name: "Diamonds" },
       update: {},
-      create: { id: uuidv4(), name: "Diamonds", symbol: "DMD" },
+      create: { id: DMD_ID, name: "Diamonds", symbol: "DMD" },
     }),
     prisma.assetType.upsert({
       where: { name: "Loyalty Points" },
       update: {},
-      create: { id: uuidv4(), name: "Loyalty Points", symbol: "LPT" },
+      create: { id: LPT_ID, name: "Loyalty Points", symbol: "LPT" },
     }),
   ]);
 
