@@ -20,6 +20,7 @@ enum TransactionType {
 
 model AssetType {
   id        String    @id @default(uuid())
+  code      String    @unique
   name      String    @unique
   symbol    String    @unique
   createdAt DateTime  @default(now()) @map("created_at")
@@ -54,6 +55,7 @@ model LedgerEntry {
   idempotencyKey  String          @unique @map("idempotency_key")
   referenceId     String?         @map("reference_id")
   note            String?
+  metadata        Json?
   createdAt       DateTime        @default(now()) @map("created_at")
 
   debitAccount  Account @relation("DebitAccount", fields: [debitAccountId], references: [id])
