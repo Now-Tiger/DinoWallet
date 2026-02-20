@@ -1,0 +1,186 @@
+{
+  "info": {
+    "name": "DinoWallet API",
+    "description": "Postman collection for the DinoWallet gaming wallet API.\n\nPre-seeded users: `user-alice`, `user-bob`\nPre-seeded asset types:\n- Gold Coins: `00000000-0000-4000-a000-000000000001`\n- Diamonds: `00000000-0000-4000-a000-000000000002`\n- Loyalty Points: `00000000-0000-4000-a000-000000000003`",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl",    "value": "http://localhost:8000/v1" },
+    { "key": "userId",     "value": "user-alice" },
+    { "key": "goldAsset",  "value": "00000000-0000-4000-a000-000000000001" },
+    { "key": "dmdAsset",   "value": "00000000-0000-4000-a000-000000000002" },
+    { "key": "lptAsset",   "value": "00000000-0000-4000-a000-000000000003" }
+  ],
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "http://localhost:8000/health", "host": ["http://localhost:8000"], "path": ["health"] }
+      }
+    },
+    {
+      "name": "List All Accounts",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/wallets/users", "host": ["{{baseUrl}}"], "path": ["wallets", "users"] }
+      }
+    },
+    {
+      "name": "Get Balances",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/wallets/{{userId}}/balance", "host": ["{{baseUrl}}"], "path": ["wallets", "{{userId}}", "balance"] }
+      }
+    },
+    {
+      "name": "Get Transactions",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/wallets/{{userId}}/transactions?limit=20&offset=0",
+          "host": ["{{baseUrl}}"],
+          "path": ["wallets", "{{userId}}", "transactions"],
+          "query": [
+            { "key": "limit",  "value": "20" },
+            { "key": "offset", "value": "0" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Top-Up (Gold Coins)",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": ["pm.variables.set('idempotencyKey', pm.variables.replaceIn('{{$guid}}'));"]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"amount\": 100,\n  \"assetTypeId\": \"{{goldAsset}}\",\n  \"idempotencyKey\": \"{{$guid}}\",\n  \"referenceId\": \"purchase-001\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/wallets/{{userId}}/topup", "host": ["{{baseUrl}}"], "path": ["wallets", "{{userId}}", "topup"] }
+      }
+    },
+    {
+      "name": "Top-Up (Diamonds)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"amount\": 20,\n  \"assetTypeId\": \"{{dmdAsset}}\",\n  \"idempotencyKey\": \"{{$guid}}\",\n  \"referenceId\": \"purchase-002\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/wallets/{{userId}}/topup", "host": ["{{baseUrl}}"], "path": ["wallets", "{{userId}}", "topup"] }
+      }
+    },
+    {
+      "name": "Issue Bonus (Loyalty Points)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"amount\": 50,\n  \"assetTypeId\": \"{{lptAsset}}\",\n  \"idempotencyKey\": \"{{$guid}}\",\n  \"note\": \"Welcome bonus\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/wallets/{{userId}}/bonus", "host": ["{{baseUrl}}"], "path": ["wallets", "{{userId}}", "bonus"] }
+      }
+    },
+    {
+      "name": "Spend (Gold Coins)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"amount\": 25,\n  \"assetTypeId\": \"{{goldAsset}}\",\n  \"idempotencyKey\": \"{{$guid}}\",\n  \"note\": \"Weapon upgrade\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/wallets/{{userId}}/spend", "host": ["{{baseUrl}}"], "path": ["wallets", "{{userId}}", "spend"] }
+      }
+    },
+    {
+      "name": "Spend (Diamonds)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"amount\": 5,\n  \"assetTypeId\": \"{{dmdAsset}}\",\n  \"idempotencyKey\": \"{{$guid}}\",\n  \"note\": \"Skin purchase\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/wallets/{{userId}}/spend", "host": ["{{baseUrl}}"], "path": ["wallets", "{{userId}}", "spend"] }
+      }
+    },
+    {
+      "name": "Spend (Insufficient Funds)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"amount\": 999999999,\n  \"assetTypeId\": \"{{goldAsset}}\",\n  \"idempotencyKey\": \"{{$guid}}\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/wallets/{{userId}}/spend", "host": ["{{baseUrl}}"], "path": ["wallets", "{{userId}}", "spend"] }
+      }
+    },
+    {
+      "name": "Top-Up with Metadata",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"amount\": 10,\n  \"assetTypeId\": \"{{goldAsset}}\",\n  \"idempotencyKey\": \"{{$guid}}\",\n  \"metadata\": {\n    \"source\": \"in-app-purchase\",\n    \"platform\": \"ios\",\n    \"receiptId\": \"RCPT-12345\"\n  }\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/wallets/{{userId}}/topup", "host": ["{{baseUrl}}"], "path": ["wallets", "{{userId}}", "topup"] }
+      }
+    },
+    {
+      "name": "Idempotency Test (duplicate key)",
+      "description": "Run this request twice with the SAME body to verify 200 OK on replay. Replace the idempotencyKey below with a fixed UUID, then send twice.",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"amount\": 1,\n  \"assetTypeId\": \"{{goldAsset}}\",\n  \"idempotencyKey\": \"aaaaaaaa-bbbb-4ccc-9ddd-eeeeeeeeeeee\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/wallets/{{userId}}/topup", "host": ["{{baseUrl}}"], "path": ["wallets", "{{userId}}", "topup"] }
+      }
+    },
+    {
+      "name": "Spend (Unknown User — 404)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"amount\": 1,\n  \"assetTypeId\": \"{{goldAsset}}\",\n  \"idempotencyKey\": \"{{$guid}}\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/wallets/ghost-user/spend", "host": ["{{baseUrl}}"], "path": ["wallets", "ghost-user", "spend"] }
+      }
+    },
+    {
+      "name": "Top-Up (Validation Error — missing amount)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"assetTypeId\": \"{{goldAsset}}\",\n  \"idempotencyKey\": \"{{$guid}}\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/wallets/{{userId}}/topup", "host": ["{{baseUrl}}"], "path": ["wallets", "{{userId}}", "topup"] }
+      }
+    }
+  ]
+}
