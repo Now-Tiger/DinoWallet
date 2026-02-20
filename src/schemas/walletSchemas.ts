@@ -8,6 +8,7 @@ export const topUpSchema = z.object({
   assetTypeId: uuidString,
   idempotencyKey: uuidString,
   referenceId: z.string().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const bonusSchema = z.object({
@@ -15,6 +16,7 @@ export const bonusSchema = z.object({
   assetTypeId: uuidString,
   idempotencyKey: uuidString,
   note: z.string().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const spendSchema = z.object({
@@ -23,4 +25,5 @@ export const spendSchema = z.object({
   idempotencyKey: uuidString,
   referenceId: z.string().optional(),
   note: z.string().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });

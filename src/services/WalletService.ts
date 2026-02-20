@@ -3,12 +3,13 @@ import {
   Prisma,
   TransactionType,
   OwnerType,
-  type LedgerEntry,
 } from "../generated/prisma/client";
 import {
   InsufficientBalanceError,
   AccountNotFoundError,
-} from "../errors/WalletErrors";
+  DuplicateTransactionError,
+} from "../domain/errors";
+import { Money } from "../domain/values";
 
 const TREASURY_OWNER_ID = "system-treasury";
 
@@ -19,6 +20,16 @@ export interface TransactionParams {
   idempotencyKey: string;
   referenceId?: string;
   note?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface TransactionResult {
+  transactionId: string;
+  type: TransactionType;
+  amount: string;
+  newBalance: string;
+  metadata?: Record<string, unknown> | null;
+  createdAt: Date;
 }
 
 export interface AssetBalance {
@@ -88,24 +99,30 @@ const computeBalance = async (
   return Number(result[0]?.balance ?? 0);
 };
 
-const findExistingTransaction = async (
+const guardIdempotency = async (
   tx: TxClient,
   idempotencyKey: string,
-): Promise<LedgerEntry | null> =>
-  tx.ledgerEntry.findUnique({ where: { idempotencyKey } });
+): Promise<void> => {
+  const existing = await tx.ledgerEntry.findUnique({
+    where: { idempotencyKey },
+  });
+  if (existing) throw new DuplicateTransactionError(idempotencyKey, existing);
+};
 
 /**
  * Wraps a transactional operation so that a unique-constraint race
  * on idempotency_key is gracefully handled as idempotent replay.
  */
-const withIdempotencyGuard = async (
+const withIdempotencyGuard = async <T>(
   prisma: PrismaClient,
   idempotencyKey: string,
-  operation: () => Promise<LedgerEntry>,
-): Promise<LedgerEntry> => {
+  operation: () => Promise<T>,
+): Promise<T> => {
   try {
     return await operation();
   } catch (error) {
+    if (error instanceof DuplicateTransactionError) throw error;
+
     const isUniqueViolation =
       error instanceof Prisma.PrismaClientKnownRequestError &&
       (error as { code: string }).code === "P2002";
@@ -113,7 +130,9 @@ const withIdempotencyGuard = async (
       const existing = await prisma.ledgerEntry.findUnique({
         where: { idempotencyKey },
       });
-      if (existing) return existing;
+      if (existing) {
+        throw new DuplicateTransactionError(idempotencyKey, existing);
+      }
     }
     throw error;
   }
@@ -123,15 +142,17 @@ export const createWalletService = (prisma: PrismaClient) => {
   const creditUserAccount = async (
     type: TransactionType,
     params: TransactionParams,
-  ): Promise<LedgerEntry> => {
-    const { userId, assetTypeId, amount, idempotencyKey, referenceId, note } =
-      params;
+  ): Promise<TransactionResult> => {
+    const {
+      userId, assetTypeId, amount, idempotencyKey,
+      referenceId, note, metadata,
+    } = params;
+    const money = new Money(amount);
 
     return withIdempotencyGuard(prisma, idempotencyKey, () =>
       prisma.$transaction(async (_tx) => {
         const tx = _tx as TxClient;
-        const existing = await findExistingTransaction(tx, idempotencyKey);
-        if (existing) return existing;
+        await guardIdempotency(tx, idempotencyKey);
 
         const { userAccount, treasuryAccount } = await resolveAccounts(
           tx,
@@ -140,17 +161,29 @@ export const createWalletService = (prisma: PrismaClient) => {
         );
         await lockAccountsInOrder(tx, treasuryAccount.id, userAccount.id);
 
-        return tx.ledgerEntry.create({
+        const entry = await tx.ledgerEntry.create({
           data: {
             debitAccountId: treasuryAccount.id,
             creditAccountId: userAccount.id,
-            amount,
+            amount: money.value,
             type,
             idempotencyKey,
             referenceId,
             note,
+            metadata: metadata ?? undefined,
           },
         });
+
+        const newBalance = await computeBalance(tx, userAccount.id);
+
+        return {
+          transactionId: entry.id,
+          type,
+          amount: String(money.value),
+          newBalance: String(newBalance),
+          metadata: entry.metadata as Record<string, unknown> | null,
+          createdAt: entry.createdAt,
+        };
       }),
     );
   };
@@ -167,15 +200,17 @@ export const createWalletService = (prisma: PrismaClient) => {
       note: params.note ?? "Bonus credit",
     });
 
-  const spend = async (params: TransactionParams): Promise<LedgerEntry> => {
-    const { userId, assetTypeId, amount, idempotencyKey, referenceId, note } =
-      params;
+  const spend = async (params: TransactionParams): Promise<TransactionResult> => {
+    const {
+      userId, assetTypeId, amount, idempotencyKey,
+      referenceId, note, metadata,
+    } = params;
+    const money = new Money(amount);
 
     return withIdempotencyGuard(prisma, idempotencyKey, () =>
       prisma.$transaction(async (_tx) => {
         const tx = _tx as TxClient;
-        const existing = await findExistingTransaction(tx, idempotencyKey);
-        if (existing) return existing;
+        await guardIdempotency(tx, idempotencyKey);
 
         const { userAccount, treasuryAccount } = await resolveAccounts(
           tx,
@@ -185,21 +220,34 @@ export const createWalletService = (prisma: PrismaClient) => {
         await lockAccountsInOrder(tx, userAccount.id, treasuryAccount.id);
 
         const balance = await computeBalance(tx, userAccount.id);
-        if (balance < amount) {
-          throw new InsufficientBalanceError(String(balance), String(amount));
+        if (balance < money.value) {
+          throw new InsufficientBalanceError(
+            String(balance),
+            String(money.value),
+          );
         }
 
-        return tx.ledgerEntry.create({
+        const entry = await tx.ledgerEntry.create({
           data: {
             debitAccountId: userAccount.id,
             creditAccountId: treasuryAccount.id,
-            amount,
+            amount: money.value,
             type: TransactionType.SPEND,
             idempotencyKey,
             referenceId,
             note: note ?? "Credit spend",
+            metadata: metadata ?? undefined,
           },
         });
+
+        return {
+          transactionId: entry.id,
+          type: TransactionType.SPEND,
+          amount: String(money.value),
+          newBalance: String(balance - money.value),
+          metadata: entry.metadata as Record<string, unknown> | null,
+          createdAt: entry.createdAt,
+        };
       }),
     );
   };
