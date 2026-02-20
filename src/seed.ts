@@ -16,17 +16,17 @@ async function main() {
     prisma.assetType.upsert({
       where: { name: "Gold Coins" },
       update: {},
-      create: { id: GOLD_ID, name: "Gold Coins", symbol: "GLD" },
+      create: { id: GOLD_ID, code: "GOLD_COINS", name: "Gold Coins", symbol: "GLD" },
     }),
     prisma.assetType.upsert({
       where: { name: "Diamonds" },
       update: {},
-      create: { id: DMD_ID, name: "Diamonds", symbol: "DMD" },
+      create: { id: DMD_ID, code: "DIAMONDS", name: "Diamonds", symbol: "DMD" },
     }),
     prisma.assetType.upsert({
       where: { name: "Loyalty Points" },
       update: {},
-      create: { id: LPT_ID, name: "Loyalty Points", symbol: "LPT" },
+      create: { id: LPT_ID, code: "LOYALTY_POINTS", name: "Loyalty Points", symbol: "LPT" },
     }),
   ]);
 
