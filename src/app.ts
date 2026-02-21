@@ -14,7 +14,7 @@ export const buildApp = async (): Promise<FastifyInstance> => {
   const app = Fastify({
     logger: {
       transport:
-        process.env.ENV === "production"
+        process.env.ENV === "development"
           ? { target: "pino-pretty" }
           : undefined,
     },
@@ -25,9 +25,9 @@ export const buildApp = async (): Promise<FastifyInstance> => {
   await app.register(errorHandlerPlugin);
   await app.register(prismaPlugin);
   await app.register(walletRoutes, { prefix: "/v1" });
-  
+
   app.get("/", async () => ({ message: "Home page", success: true }));
-  
+
   app.get("/health", async () => ({
     status: "ok",
     timestamp: new Date().toISOString(),
